@@ -84,9 +84,12 @@ async function main() {
     const page = await browser.newPage();
     await page.goto(`${sidecarUrl}/?companyId=${encodeURIComponent(COMPANY_ID)}`, { waitUntil: "networkidle" });
 
-    const zones = page.locator("main .zone");
-    assert.equal(await zones.count(), 4, "the four operational zones should be rendered");
-    for (let index = 0; index < 4; index += 1) assert.equal(await zones.nth(index).isVisible(), true);
+    const landmarkNames = ["Company overview", "Agent graph", "Decision rail", "Operations timeline"];
+    for (const name of landmarkNames) {
+      const landmark = page.getByRole("region", { name, exact: true });
+      assert.equal(await landmark.count(), 1, `${name} landmark should be rendered once`);
+      assert.equal(await landmark.isVisible(), true, `${name} landmark should be visible`);
+    }
 
     assert.equal(await page.locator(".site-header").getByText("Paperclip / Operations", { exact: true }).isVisible(), true, "legal masthead should be visible");
     assert.equal(await page.getByText("Read-only Mission Control", { exact: true }).isVisible(), true, "read-only label should be visible");
