@@ -2,7 +2,12 @@
   "name": "@brainpulse/mission-control",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "start": "node src/server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "smoke:browser": "node test/browser-smoke.mjs"
   }
 }
