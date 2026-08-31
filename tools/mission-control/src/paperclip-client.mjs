@@ -1,4 +1,5 @@
 import { normalizeCompanyState } from "./state.mjs";
+import { classifyAction } from "./policy.mjs";
 
 function requestError(status) {
   return new Error(`Paperclip request failed: ${status}`);
@@ -11,13 +12,15 @@ function scalar(value) {
 function sanitizeApproval(approval) {
   const source = approval && typeof approval === "object" ? approval : {};
   // Approval payloads can contain credentials and runtime configuration. Keep
-  // only top-level display/status fields from the allowlist; never copy payload.
+  // only top-level display/status fields from the allowlist; never copy payload
+  // or trust a non-contract `protected` field supplied by the upstream.
+  const classification = classifyAction({ type: scalar(source.type) });
   return {
     id: scalar(source.id),
     type: scalar(source.type),
     status: scalar(source.status),
     title: scalar(source.title),
-    protected: typeof source.protected === "boolean" ? source.protected : undefined,
+    categories: classification.categories,
   };
 }
 

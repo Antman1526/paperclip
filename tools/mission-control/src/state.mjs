@@ -1,3 +1,5 @@
+import { classifyAction } from "./policy.mjs";
+
 const UNKNOWN = "Unknown";
 const LANE_STATUSES = new Set(["healthy", "attention", "blocked", "unknown"]);
 const AGENT_STATUS_HEALTH = Object.freeze({
@@ -82,15 +84,21 @@ export function normalizeCompanyState({
       triggers: Array.isArray(routine.triggers) ? routine.triggers.map(summarizeTrigger) : [],
       link: sourceLink("routines", routine.id),
     })),
-    decisions: (Array.isArray(approvals) ? approvals : []).map((approval = {}) => ({
-      id: valueOrUnknown(approval.id),
-      title: valueOrUnknown(approval.title ?? (typeof approval.type === "string" && approval.type.length > 0
-        ? approval.type.replaceAll("_", " ")
-        : null)),
-      status: valueOrUnknown(approval.status),
-      protected: typeof approval.protected === "boolean" ? approval.protected : UNKNOWN,
-      link: sourceLink("approvals", approval.id),
-    })),
+    decisions: (Array.isArray(approvals) ? approvals : []).map((approval = {}) => {
+      const classification = classifyAction({
+        type: approval.type,
+        categories: approval.categories,
+      });
+      return {
+        id: valueOrUnknown(approval.id),
+        title: valueOrUnknown(approval.title ?? (typeof approval.type === "string" && approval.type.length > 0
+          ? approval.type.replaceAll("_", " ")
+          : null)),
+        status: valueOrUnknown(approval.status),
+        protected: classification.protected,
+        link: sourceLink("approvals", approval.id),
+      };
+    }),
     timeline: (Array.isArray(issues) ? issues : []).slice(0, 20).map((issue = {}) => ({
       id: valueOrUnknown(issue.id),
       identifier: valueOrUnknown(issue.identifier),

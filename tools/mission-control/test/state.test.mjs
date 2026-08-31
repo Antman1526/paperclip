@@ -56,6 +56,43 @@ test("uses Unknown links when source identifiers are missing", () => {
   assert.equal(state.timeline[0].link, "Unknown");
 });
 
+test("derives protected owner boundaries from real-shaped Paperclip approval types", () => {
+  const state = normalizeCompanyState({
+    approvals: [
+      {
+        id: "approval-budget",
+        type: "budget_override_required",
+        status: "pending",
+        createdAt: "2026-08-31T14:00:00.000Z",
+        updatedAt: "2026-08-31T14:05:00.000Z",
+        payload: { budgetAmount: 1000, apiKey: "synthetic-secret-must-not-copy" },
+      },
+      {
+        id: "approval-board",
+        type: "request_board_approval",
+        status: "pending",
+        createdAt: "2026-08-31T14:01:00.000Z",
+        updatedAt: "2026-08-31T14:06:00.000Z",
+        payload: { summary: "Synthetic owner decision", token: "synthetic-token-must-not-copy" },
+      },
+      {
+        id: "approval-future",
+        type: "future_approval_type",
+        status: "pending",
+        createdAt: "2026-08-31T14:02:00.000Z",
+        updatedAt: "2026-08-31T14:07:00.000Z",
+        payload: { secret: "synthetic-secret-must-not-copy" },
+      },
+    ],
+  });
+
+  assert.equal(state.decisions[0].protected, true);
+  assert.equal(state.decisions[1].protected, true);
+  assert.equal(state.decisions[2].protected, "Unknown");
+  assert.equal(JSON.stringify(state).includes("synthetic-secret-must-not-copy"), false);
+  assert.equal(JSON.stringify(state).includes("synthetic-token-must-not-copy"), false);
+});
+
 test("derives lane status from health override then agent health", () => {
   assert.equal(deriveLaneStatus({ id: "a1", health: "attention" }, { a1: "healthy" }), "healthy");
   assert.equal(deriveLaneStatus({ id: "a1", health: "blocked" }), "blocked");

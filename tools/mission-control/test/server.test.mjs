@@ -31,7 +31,35 @@ test("client reads all company resources with a bearer key and normalizes the re
     "/api/companies/c%201/agents": [{ id: "a1", name: "Ops", status: "idle" }],
     "/api/companies/c%201/routines": [{ id: "r1", title: "Brief", status: "active" }],
     "/api/companies/c%201/issues?limit=20": [{ id: "i1", identifier: "PAP-1", title: "Test" }],
-    "/api/companies/c%201/approvals": [{ id: "approval-1", type: "hire_agent", status: "pending", payload: { title: "secret title", apiKey: "do-not-leak" } }],
+    "/api/companies/c%201/approvals": [
+      {
+        id: "approval-budget",
+        type: "budget_override_required",
+        status: "pending",
+        protected: false,
+        createdAt: "2026-08-31T14:00:00.000Z",
+        updatedAt: "2026-08-31T14:05:00.000Z",
+        payload: { title: "secret title", apiKey: "do-not-leak" },
+      },
+      {
+        id: "approval-board",
+        type: "request_board_approval",
+        status: "pending",
+        protected: false,
+        createdAt: "2026-08-31T14:01:00.000Z",
+        updatedAt: "2026-08-31T14:06:00.000Z",
+        payload: { summary: "synthetic owner decision", token: "synthetic-token" },
+      },
+      {
+        id: "approval-future",
+        type: "future_approval_type",
+        status: "pending",
+        protected: true,
+        createdAt: "2026-08-31T14:02:00.000Z",
+        updatedAt: "2026-08-31T14:07:00.000Z",
+        payload: { details: "future payload", secret: "synthetic-secret" },
+      },
+    ],
   };
   const client = createPaperclipClient({
     baseUrl: "http://paperclip.test/",
@@ -52,9 +80,16 @@ test("client reads all company resources with a bearer key and normalizes the re
   assert.equal(state.timeline[0].identifier, "PAP-1");
   assert.equal(requests.length, 6);
   assert.ok(requests.every(({ options }) => options.headers.authorization === "Bearer secret"));
-  assert.equal(state.decisions[0].title, "hire agent");
+  assert.equal(state.decisions[0].title, "budget override required");
+  assert.equal(state.decisions[0].protected, true);
+  assert.equal(state.decisions[1].title, "request board approval");
+  assert.equal(state.decisions[1].protected, true);
+  assert.equal(state.decisions[2].title, "future approval type");
+  assert.equal(state.decisions[2].protected, "Unknown");
   assert.equal(JSON.stringify(state).includes("do-not-leak"), false);
   assert.equal(JSON.stringify(state).includes("secret title"), false);
+  assert.equal(JSON.stringify(state).includes("synthetic-token"), false);
+  assert.equal(JSON.stringify(state).includes("synthetic-secret"), false);
 });
 
 test("client times out a hung upstream read", async () => {
