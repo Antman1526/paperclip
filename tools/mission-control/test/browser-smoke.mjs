@@ -11,6 +11,7 @@ const FIXTURE_STATE = Object.freeze({
     {
       id: "chief-of-staff",
       name: "Chief of Staff",
+      role: "ceo",
       model: "fixture-model",
       status: "idle",
       health: "unknown",

@@ -145,8 +145,7 @@ export function renderGraph(state) {
   const agents = Array.isArray(current.agents) ? current.agents : [];
   const centerIndex = agents.findIndex((agent) => {
     const role = display(agent?.role).toLowerCase().replaceAll(/[^a-z0-9]+/g, "_");
-    const name = display(agent?.name);
-    return role === "ceo" || role === "chief_of_staff" || /^chief\s+of\s+staff$/i.test(name);
+    return role === "ceo" || role === "chief_of_staff";
   });
   const resolvedCenterIndex = centerIndex >= 0 ? centerIndex : -1;
   const center = resolvedCenterIndex >= 0 ? agents[resolvedCenterIndex] : {};
