@@ -48,26 +48,45 @@ function statusBadge(value) {
 
 function sourceLink(link, label = link) {
   const source = display(link);
-  if (source === UNKNOWN) return `<span class="source-link source-unknown">Source: ${UNKNOWN}</span>`;
-  const base = paperclipBaseUrl();
-  let href;
-  try {
-    href = new URL(source, base).href;
-  } catch {
-    href = source;
-  }
+  const href = resolvePaperclipLink(source);
+  if (!href) return `<span class="source-link source-unknown">Source: ${UNKNOWN}</span>`;
   return `<a class="source-link" href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${escapeHtml(label ?? source)} <span aria-hidden="true">↗</span></a>`;
 }
 
 function paperclipBaseUrl() {
   const configured = globalThis.PAPERCLIP_BASE_URL
     || (typeof document !== "undefined" ? document.documentElement?.dataset?.paperclipBaseUrl : null)
-    || "/";
+    || "";
   try {
-    return new URL(configured, globalThis.location?.href || "http://localhost/").href;
+    const parsed = new URL(configured);
+    if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) return null;
+    return parsed.origin;
   } catch {
-    return "/";
+    return null;
   }
+}
+
+const PAPERCLIP_SOURCE_PATH = /^\/(?:agents|routines|issues|approvals)\/[^/]+(?:\/.*)?$/;
+
+function resolvePaperclipLink(source) {
+  const base = paperclipBaseUrl();
+  if (!base || !source || source === UNKNOWN) return null;
+  const trimmed = String(source).trim();
+  if (!trimmed || trimmed.startsWith("//") || /[\\\u0000-\u001f]/.test(trimmed)) return null;
+
+  let parsed;
+  try {
+    parsed = trimmed.startsWith("/") ? new URL(trimmed, `${base}/`) : new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if (parsed.origin !== base || parsed.username || parsed.password || !PAPERCLIP_SOURCE_PATH.test(parsed.pathname)) return null;
+  try {
+    decodeURIComponent(parsed.pathname);
+  } catch {
+    return null;
+  }
+  return parsed.href;
 }
 
 function count(value) {
@@ -184,7 +203,43 @@ function elements() {
 function setStale(stale) {
   document.body.classList.toggle("is-stale", stale);
   for (const element of [document.getElementById("company-header"), document.getElementById("agent-graph"), document.getElementById("decision-rail"), document.getElementById("operations-timeline")]) {
-    element?.closest(".zone")?.classList.toggle("is-stale", stale);
+    const zone = element?.closest(".zone");
+    zone?.classList.toggle("is-stale", stale);
+    if (!zone?.querySelectorAll) continue;
+    for (const node of zone.querySelectorAll(".boundary")) {
+      if (stale) {
+        if (!node.dataset.staleTone) {
+          const tone = [...node.classList].find((name) => name.startsWith("boundary-") && name !== "boundary");
+          if (tone) node.dataset.staleTone = tone;
+        }
+        for (const name of [...node.classList]) {
+          if (name.startsWith("boundary-") && name !== "boundary") node.classList.remove(name);
+        }
+        node.classList.add("boundary-stale");
+        node.setAttribute?.("data-stale", "true");
+      } else if (node.dataset.staleTone) {
+        node.classList.remove("boundary-stale");
+        node.classList.add(node.dataset.staleTone);
+        delete node.dataset.staleTone;
+        node.removeAttribute?.("data-stale");
+      }
+    }
+    for (const node of zone.querySelectorAll(".status-badge")) {
+      if (stale) {
+        if (!node.dataset.staleTone) {
+          const tone = [...node.classList].find((name) => name.startsWith("status-") && name !== "status-badge");
+          if (tone) node.dataset.staleTone = tone;
+        }
+        for (const name of [...node.classList]) {
+          if (name.startsWith("status-") && name !== "status-badge") node.classList.remove(name);
+        }
+        node.classList.add("status-stale");
+      } else if (node.dataset.staleTone) {
+        node.classList.remove("status-stale");
+        node.classList.add(node.dataset.staleTone);
+        delete node.dataset.staleTone;
+      }
+    }
   }
 }
 
@@ -243,16 +298,12 @@ async function poll() {
   } catch (error) {
     if (error?.unavailable) renderUnavailable();
     else renderUnknownData(error);
-    if (error?.unavailable) {
-      const graph = document.getElementById("agent-graph");
-      if (graph) graph.innerHTML = `<div class="control-plane-error" role="alert"><span class="error-mark" aria-hidden="true">×</span><div><h3>Control plane unavailable</h3><p>Mission Control could not read the latest company state.</p></div></div>`;
-    }
   } finally {
     pollInFlight = false;
   }
 }
 
-export { readState, poll };
+export { readState, poll, resolvePaperclipLink, sourceLink, setStale };
 
 if (typeof document !== "undefined") {
   void poll();

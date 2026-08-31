@@ -37,7 +37,25 @@ function sendMethodNotAllowed(response) {
   sendJson(response, 405, { error: "METHOD_NOT_ALLOWED" });
 }
 
-async function serveStatic(response, pathname, publicDir, method) {
+function configuredPaperclipOrigin(baseUrl) {
+  try {
+    const parsed = new URL(String(baseUrl));
+    if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) return "";
+    return parsed.origin;
+  } catch {
+    return "";
+  }
+}
+
+function escapeHtmlAttribute(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+async function serveStatic(response, pathname, publicDir, method, paperclipBaseUrl) {
   let relativePath;
   try {
     relativePath = decodeURIComponent(pathname === "/" ? "/index.html" : pathname);
@@ -82,6 +100,25 @@ async function serveStatic(response, pathname, publicDir, method) {
     return;
   }
 
+  if (path.extname(realTarget).toLowerCase() === ".html") {
+    const source = await fs.readFile(realTarget, "utf8");
+    const body = source.replace(
+      /data-paperclip-base-url="[^"]*"/,
+      `data-paperclip-base-url="${escapeHtmlAttribute(paperclipBaseUrl)}"`,
+    );
+    response.writeHead(200, {
+      "content-type": CONTENT_TYPES[".html"],
+      "content-length": Buffer.byteLength(body),
+      "cache-control": "no-cache",
+    });
+    if (method === "HEAD") {
+      response.end();
+      return;
+    }
+    response.end(body);
+    return;
+  }
+
   response.writeHead(200, {
     "content-type": CONTENT_TYPES[path.extname(realTarget).toLowerCase()] ?? "application/octet-stream",
     "content-length": stat.size,
@@ -102,6 +139,7 @@ export function createServer({
   publicDir = DEFAULT_PUBLIC_DIR,
 } = {}) {
   const paperclip = client ?? createPaperclipClient({ baseUrl, apiKey, ...(fetchImpl ? { fetchImpl } : {}) });
+  const paperclipOrigin = configuredPaperclipOrigin(baseUrl);
 
   return createHttpServer(async (request, response) => {
     const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? DEFAULT_HOST}`);
@@ -129,7 +167,7 @@ export function createServer({
     }
 
     if (request.method !== "GET" && request.method !== "HEAD") return sendMethodNotAllowed(response);
-    return serveStatic(response, requestUrl.pathname, publicDir, request.method);
+    return serveStatic(response, requestUrl.pathname, publicDir, request.method, paperclipOrigin);
   });
 }
 

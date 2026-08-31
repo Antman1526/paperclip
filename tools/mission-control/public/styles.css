@@ -65,6 +65,7 @@ code, .metric-machine, .decision-id, .timeline-id { color: var(--ink-500); font-
 .brand-mark { display: grid; width: 2rem; height: 2rem; place-items: center; color: var(--blue-400); border: 1px solid rgba(85, 183, 255, 0.5); border-radius: 0.55rem; background: rgba(22, 131, 232, 0.12); }
 .eyebrow, .company-kicker, .metric-label, .node-label, .subheading { color: var(--ink-500); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase; }
 .readonly-label { padding: 0.35rem 0.65rem; border: 1px solid rgba(109, 224, 160, 0.42); border-radius: 99px; color: var(--green-400); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; }
+body.is-stale .readonly-label { border-color: rgba(242, 189, 102, 0.62); color: var(--amber-400); }
 
 .mission-shell { display: grid; gap: 1rem; width: min(1400px, 100%); margin: 0 auto; padding: 1.25rem clamp(1rem, 4vw, 3.5rem) 3rem; }
 .live-status { min-height: 1.65rem; color: var(--ink-300); font-size: 0.77rem; }
@@ -109,6 +110,7 @@ code, .metric-machine, .decision-id, .timeline-id { color: var(--ink-500); font-
 .boundary-blocked { color: var(--red-400); background: rgba(255, 129, 127, 0.1); }
 .boundary-healthy { color: var(--green-400); background: rgba(109, 224, 160, 0.1); }
 .boundary-unknown { color: var(--ink-500); background: rgba(125, 140, 167, 0.1); }
+.boundary-stale { color: var(--amber-400); background: rgba(242, 189, 102, 0.12); }
 .boundary-icon { display: grid; width: 1rem; height: 1rem; place-items: center; border: 1px solid currentColor; border-radius: 50%; font-size: 0.66rem; }
 .source-link { width: fit-content; color: var(--blue-400); font-size: 0.72rem; text-decoration: none; }
 .source-link:hover { text-decoration: underline; }
@@ -134,8 +136,10 @@ button { margin-top: 0.8rem; padding: 0.45rem 0.7rem; border: 1px solid var(--bl
 button:hover { background: rgba(22, 131, 232, 0.35); }
 
 .is-stale .status-badge { color: var(--ink-500); background: rgba(125, 140, 167, 0.12); }
+.status-stale .status-dot { background: var(--amber-400); }
 .is-stale .status-dot { background: var(--ink-500) !important; }
-.zone.is-stale { border-color: rgba(242, 189, 102, 0.28); }
+.zone.is-stale { border-color: rgba(242, 189, 102, 0.44); }
+.zone.is-stale::before { display: block; padding: 0.35rem 1.15rem; color: var(--amber-400); background: rgba(242, 189, 102, 0.08); content: "STALE SNAPSHOT · READ-ONLY"; font-size: 0.64rem; font-weight: 800; letter-spacing: 0.12em; }
 .noscript-note { margin: 1.5rem; color: var(--amber-400); }
 
 :focus-visible { outline: 3px solid var(--blue-400); outline-offset: 3px; }
