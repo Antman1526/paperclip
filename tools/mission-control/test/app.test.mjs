@@ -139,6 +139,11 @@ test("stale transitions remove healthy styling and expose an explicit stale stat
   await poll();
   assert.match(document.nodes.get("agent-graph").innerHTML, /Unknown data/);
   assert.equal(typeof document.retry.listeners.click, "function");
+  const beforeRetry = requests.length;
+  document.retry.listeners.click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.ok(requests.length > beforeRetry);
+  assert.ok(requests.slice(beforeRetry).every((options) => !options.method || options.method === "GET"));
   globalThis.document = priorDocument;
   globalThis.location = priorLocation;
   globalThis.fetch = priorFetch;

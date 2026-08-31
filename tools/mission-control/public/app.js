@@ -81,11 +81,13 @@ function resolvePaperclipLink(source) {
     return null;
   }
   if (parsed.origin !== base || parsed.username || parsed.password || !PAPERCLIP_SOURCE_PATH.test(parsed.pathname)) return null;
+  let decodedPath;
   try {
-    decodeURIComponent(parsed.pathname);
+    decodedPath = decodeURIComponent(parsed.pathname);
   } catch {
     return null;
   }
+  if (/[\\\u0000-\u001f\u007f]/.test(decodedPath) || !PAPERCLIP_SOURCE_PATH.test(decodedPath)) return null;
   return parsed.href;
 }
 
