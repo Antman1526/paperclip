@@ -1,5 +1,6 @@
 const UNKNOWN = "Unknown";
 const POLL_INTERVAL_MS = 15_000;
+const READ_TIMEOUT_MS = 5_000;
 
 const emptyState = {
   company: { id: UNKNOWN, name: UNKNOWN },
@@ -142,8 +143,12 @@ function agentCard(agent, center = false) {
 export function renderGraph(state) {
   const current = safeState(state);
   const agents = Array.isArray(current.agents) ? current.agents : [];
-  const centerIndex = agents.findIndex((agent) => /chief\s+of\s+staff|ceo/i.test(display(agent?.name)));
-  const resolvedCenterIndex = centerIndex >= 0 ? centerIndex : agents.length ? 0 : -1;
+  const centerIndex = agents.findIndex((agent) => {
+    const role = display(agent?.role).toLowerCase().replaceAll(/[^a-z0-9]+/g, "_");
+    const name = display(agent?.name);
+    return role === "ceo" || role === "chief_of_staff" || /^chief\s+of\s+staff$/i.test(name);
+  });
+  const resolvedCenterIndex = centerIndex >= 0 ? centerIndex : -1;
   const center = resolvedCenterIndex >= 0 ? agents[resolvedCenterIndex] : {};
   const lanes = agents.filter((_, index) => index !== resolvedCenterIndex);
   return `<div class="graph-layout">
@@ -276,21 +281,42 @@ function renderUnknownData(error) {
   void error;
 }
 
-async function readState() {
+async function readState({ timeoutMs = READ_TIMEOUT_MS } = {}) {
   const params = new URLSearchParams(globalThis.location?.search || "");
   const companyId = params.get("companyId");
   if (!companyId) throw new Error("COMPANY_ID_REQUIRED");
-  const response = await fetch(`/api/mission-control/state?companyId=${encodeURIComponent(companyId)}`, { headers: { accept: "application/json" }, cache: "no-store" });
-  if (response.status === 503) throw Object.assign(new Error("CONTROL_PLANE_UNAVAILABLE"), { unavailable: true });
-  if (!response.ok) throw new Error(`READ_FAILED_${response.status}`);
-  return response.json();
+  const controller = new AbortController();
+  const duration = Number(timeoutMs);
+  let timer;
+  const timeoutPromise = Number.isFinite(duration) && duration > 0
+    ? new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(Object.assign(new Error("READ_TIMEOUT"), { timeout: true }));
+      }, duration);
+    })
+    : null;
+  const request = fetch(`/api/mission-control/state?companyId=${encodeURIComponent(companyId)}`, {
+    headers: { accept: "application/json" },
+    cache: "no-store",
+    signal: controller.signal,
+  }).then(async (response) => {
+    if (response.status === 503) throw Object.assign(new Error("CONTROL_PLANE_UNAVAILABLE"), { unavailable: true });
+    if (!response.ok) throw new Error(`READ_FAILED_${response.status}`);
+    return response.json();
+  });
+  try {
+    return await (timeoutPromise ? Promise.race([request, timeoutPromise]) : request);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
-async function poll() {
+async function poll(options = {}) {
   if (pollInFlight) return;
   pollInFlight = true;
   try {
-    const state = await readState();
+    const state = await readState(options);
     if (!state || typeof state !== "object" || Array.isArray(state)) throw new Error("MALFORMED_JSON");
     lastState = state;
     lastTimestamp = display(state.generatedAt) === UNKNOWN ? lastTimestamp : state.generatedAt;

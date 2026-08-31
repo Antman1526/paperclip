@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeCompanyState, deriveLaneStatus } from "../src/state.mjs";
 
-test("normalizes an agent graph and preserves unknown upstream state", () => {
+test("normalizes an agent graph from Paperclip agent status fields", () => {
   const state = normalizeCompanyState({
     company: { id: "c1", name: "BrainPulse Ventures LLC" },
     agents: [{ id: "a1", name: "Summarizer", status: "idle" }],
@@ -13,7 +13,7 @@ test("normalizes an agent graph and preserves unknown upstream state", () => {
     now: new Date("2026-08-31T15:00:00Z"),
   });
   assert.equal(state.company.name, "BrainPulse Ventures LLC");
-  assert.equal(state.agents[0].health, "Unknown");
+  assert.equal(state.agents[0].health, "healthy");
   assert.equal(state.routines[0].status, "active");
 });
 

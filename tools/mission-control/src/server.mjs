@@ -7,6 +7,7 @@ import { createPaperclipClient } from "./paperclip-client.mjs";
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 61962;
+const DEFAULT_UPSTREAM_TIMEOUT_MS = 7_000;
 const DEFAULT_PUBLIC_DIR = fileURLToPath(new URL("../public/", import.meta.url));
 const CONTENT_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -45,6 +46,20 @@ function configuredPaperclipOrigin(baseUrl) {
   } catch {
     return "";
   }
+}
+
+function isLoopbackHost(host) {
+  const value = String(host ?? "").trim().toLowerCase();
+  return value === "localhost" || value === "::1" || /^127(?:\.\d{1,3}){3}$/.test(value);
+}
+
+function withTimeout(promise, timeoutMs) {
+  const duration = Number(timeoutMs);
+  if (!Number.isFinite(duration) || duration <= 0) return promise;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("upstream timeout")), duration);
+    Promise.resolve(promise).then(resolve, reject).finally(() => clearTimeout(timer));
+  });
 }
 
 function escapeHtmlAttribute(value) {
@@ -136,9 +151,16 @@ export function createServer({
   baseUrl = process.env.PAPERCLIP_API_URL ?? "http://127.0.0.1:3100",
   apiKey = process.env.PAPERCLIP_API_KEY ?? "",
   fetchImpl,
+  requestTimeoutMs,
+  upstreamTimeoutMs = DEFAULT_UPSTREAM_TIMEOUT_MS,
   publicDir = DEFAULT_PUBLIC_DIR,
 } = {}) {
-  const paperclip = client ?? createPaperclipClient({ baseUrl, apiKey, ...(fetchImpl ? { fetchImpl } : {}) });
+  const paperclip = client ?? createPaperclipClient({
+    baseUrl,
+    apiKey,
+    ...(fetchImpl ? { fetchImpl } : {}),
+    ...(requestTimeoutMs !== undefined ? { requestTimeoutMs } : {}),
+  });
   const paperclipOrigin = configuredPaperclipOrigin(baseUrl);
 
   return createHttpServer(async (request, response) => {
@@ -155,7 +177,7 @@ export function createServer({
       if (!companyId) return sendJson(response, 400, { error: "COMPANY_ID_REQUIRED" });
 
       try {
-        const state = await paperclip.readCompanyState(companyId);
+        const state = await withTimeout(paperclip.readCompanyState(companyId), upstreamTimeoutMs);
         return sendJson(response, 200, state);
       } catch {
         return sendJson(response, 503, { error: "CONTROL_PLANE_UNAVAILABLE" });
@@ -174,6 +196,9 @@ export function createServer({
 export const createMissionControlServer = createServer;
 
 export function startServer({ host = DEFAULT_HOST, port = Number(process.env.PORT ?? DEFAULT_PORT), ...options } = {}) {
+  if (!isLoopbackHost(host)) {
+    throw new TypeError(`Mission Control only supports loopback hosts; received ${host}`);
+  }
   const server = createServer(options);
   server.listen(port, host, () => {
     const address = server.address();
@@ -182,6 +207,8 @@ export function startServer({ host = DEFAULT_HOST, port = Number(process.env.POR
   });
   return server;
 }
+
+export { isLoopbackHost };
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
   startServer();

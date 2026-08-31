@@ -1,5 +1,14 @@
 const UNKNOWN = "Unknown";
 const LANE_STATUSES = new Set(["healthy", "attention", "blocked", "unknown"]);
+const AGENT_STATUS_HEALTH = Object.freeze({
+  active: "healthy",
+  idle: "healthy",
+  running: "healthy",
+  paused: "attention",
+  pending_approval: "attention",
+  error: "blocked",
+  terminated: "blocked",
+});
 
 function valueOrUnknown(value) {
   if (value === null || value === undefined || value === "") return UNKNOWN;
@@ -22,6 +31,24 @@ function summarizeTrigger(trigger) {
   };
 }
 
+function deriveAgentHealth(agent) {
+  if (LANE_STATUSES.has(agent?.health)) return agent.health;
+  const status = typeof agent?.status === "string" ? agent.status.toLowerCase() : "";
+  return AGENT_STATUS_HEALTH[status] ?? UNKNOWN;
+}
+
+function latestHeartbeat(dashboard, agents) {
+  const candidates = [
+    dashboard?.lastHeartbeatAt,
+    ...(Array.isArray(agents) ? agents.map((agent) => agent?.lastHeartbeatAt) : []),
+  ].filter((value) => typeof value === "string" && value.trim());
+  if (candidates.length === 0) return UNKNOWN;
+  const valid = candidates
+    .map((value) => ({ value, time: Date.parse(value) }))
+    .filter(({ time }) => Number.isFinite(time));
+  return (valid.length > 0 ? valid.sort((a, b) => b.time - a.time)[0].value : candidates[0]) ?? UNKNOWN;
+}
+
 export function normalizeCompanyState({
   company,
   dashboard,
@@ -34,9 +61,10 @@ export function normalizeCompanyState({
   const knownAgents = (Array.isArray(agents) ? agents : []).map((agent = {}) => ({
     id: valueOrUnknown(agent.id),
     name: valueOrUnknown(agent.name),
+    role: valueOrUnknown(agent.role),
     model: valueOrUnknown(agent.adapterConfig?.model ?? agent.model),
     status: valueOrUnknown(agent.status),
-    health: valueOrUnknown(agent.health),
+    health: deriveAgentHealth(agent),
     link: sourceLink("agents", agent.id),
   }));
 
@@ -45,7 +73,7 @@ export function normalizeCompanyState({
       id: valueOrUnknown(company?.id),
       name: valueOrUnknown(company?.name),
     },
-    heartbeat: valueOrUnknown(dashboard?.heartbeat),
+    heartbeat: latestHeartbeat(dashboard, agents),
     agents: knownAgents,
     routines: (Array.isArray(routines) ? routines : []).map((routine = {}) => ({
       id: valueOrUnknown(routine.id),
@@ -56,7 +84,9 @@ export function normalizeCompanyState({
     })),
     decisions: (Array.isArray(approvals) ? approvals : []).map((approval = {}) => ({
       id: valueOrUnknown(approval.id),
-      title: valueOrUnknown(approval.title),
+      title: valueOrUnknown(approval.title ?? (typeof approval.type === "string" && approval.type.length > 0
+        ? approval.type.replaceAll("_", " ")
+        : null)),
       status: valueOrUnknown(approval.status),
       protected: typeof approval.protected === "boolean" ? approval.protected : UNKNOWN,
       link: sourceLink("approvals", approval.id),

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createPaperclipClient } from "../src/paperclip-client.mjs";
-import { createServer } from "../src/server.mjs";
+import { createServer, startServer } from "../src/server.mjs";
 
 async function withServer(server, callback) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -31,6 +31,7 @@ test("client reads all company resources with a bearer key and normalizes the re
     "/api/companies/c%201/agents": [{ id: "a1", name: "Ops", status: "idle" }],
     "/api/companies/c%201/routines": [{ id: "r1", title: "Brief", status: "active" }],
     "/api/companies/c%201/issues?limit=20": [{ id: "i1", identifier: "PAP-1", title: "Test" }],
+    "/api/companies/c%201/approvals": [{ id: "approval-1", type: "hire_agent", status: "pending", payload: { title: "secret title", apiKey: "do-not-leak" } }],
   };
   const client = createPaperclipClient({
     baseUrl: "http://paperclip.test/",
@@ -49,8 +50,22 @@ test("client reads all company resources with a bearer key and normalizes the re
 
   assert.equal(state.company.name, "BrainPulse");
   assert.equal(state.timeline[0].identifier, "PAP-1");
-  assert.equal(requests.length, 5);
+  assert.equal(requests.length, 6);
   assert.ok(requests.every(({ options }) => options.headers.authorization === "Bearer secret"));
+  assert.equal(state.decisions[0].title, "hire agent");
+  assert.equal(JSON.stringify(state).includes("do-not-leak"), false);
+  assert.equal(JSON.stringify(state).includes("secret title"), false);
+});
+
+test("client times out a hung upstream read", async () => {
+  const client = createPaperclipClient({
+    baseUrl: "http://paperclip.test",
+    requestTimeoutMs: 10,
+    fetchImpl: (_url, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+    }),
+  });
+  await assert.rejects(() => client.readCompanyState("c1"), /Paperclip request failed: timeout/);
 });
 
 test("health check is local and does not contact Paperclip", async () => {
@@ -106,6 +121,24 @@ test("upstream failures fail closed without leaking credentials or upstream body
     assert.equal(body.includes("authorization"), false);
     assert.equal(body.includes("upstream body"), false);
   });
+});
+
+test("server bounds a hung client read and releases the request", async () => {
+  const server = createServer({
+    upstreamTimeoutMs: 10,
+    client: { readCompanyState: async () => new Promise(() => {}) },
+    publicDir: "/path/that/does/not/exist",
+  });
+  await withServer(server, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/mission-control/state?companyId=c1`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { error: "CONTROL_PLANE_UNAVAILABLE" });
+  });
+});
+
+test("startServer rejects non-loopback bindings", () => {
+  assert.throws(() => startServer({ host: "0.0.0.0" }), /only supports loopback/);
+  assert.throws(() => startServer({ host: "192.168.1.20" }), /only supports loopback/);
 });
 
 test("server does not expose mutation or unknown routes", async () => {

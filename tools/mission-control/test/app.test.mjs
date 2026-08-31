@@ -91,6 +91,16 @@ test("source links stay on the configured Paperclip origin and resource paths", 
   delete globalThis.PAPERCLIP_BASE_URL;
 });
 
+test("graph renders an Unknown center when no verified CEO or Chief of Staff exists", () => {
+  globalThis.PAPERCLIP_BASE_URL = PAPERCLIP_ORIGIN;
+  const markup = renderGraph({ agents: [{ id: "a1", name: "Ops Engineer", role: "engineer", status: "idle", health: "healthy", link: "/agents/a1" }] });
+  assert.match(markup, /agent-center/);
+  assert.match(markup, /<h3>Unknown<\/h3>/);
+  assert.match(markup, /<h3>Ops Engineer<\/h3>/);
+  assert.match(markup, /agent-lane/);
+  delete globalThis.PAPERCLIP_BASE_URL;
+});
+
 test("stale transitions remove healthy styling and expose an explicit stale state", async () => {
   const priorFetch = globalThis.fetch;
   const priorDocument = globalThis.document;
@@ -157,6 +167,32 @@ test("decision links reject malformed sources without changing read-only markup"
   assert.match(markup, /Source: Unknown/);
   assert.doesNotMatch(markup, /method=|form|approve|reject/);
   delete globalThis.PAPERCLIP_BASE_URL;
+});
+
+test("timed-out browser reads fail closed and release pollInFlight", async () => {
+  const priorFetch = globalThis.fetch;
+  const priorDocument = globalThis.document;
+  const priorLocation = globalThis.location;
+  const document = domFixture();
+  globalThis.document = document;
+  globalThis.location = { href: "http://mission-control.test/", search: "?companyId=c1" };
+  let mode = "hang";
+  globalThis.fetch = async (_url, { signal } = {}) => {
+    if (mode === "hang") {
+      return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true }));
+    }
+    return new Response(JSON.stringify({ company: { id: "c1", name: "Live" }, agents: [], routines: [], decisions: [], timeline: [], generatedAt: "2026-08-31T15:00:00Z" }), { status: 200 });
+  };
+  await poll({ timeoutMs: 10 });
+  assert.match(document.nodes.get("live-status").textContent, /Unknown data/);
+  assert.equal(document.body.classList.contains("is-stale"), true);
+  mode = "success";
+  await poll({ timeoutMs: 50 });
+  assert.match(document.nodes.get("live-status").textContent, /Live/);
+  assert.equal(document.body.classList.contains("is-stale"), false);
+  globalThis.document = priorDocument;
+  globalThis.location = priorLocation;
+  globalThis.fetch = priorFetch;
 });
 
 test("server injects its configured Paperclip origin into the browser shell", async () => {
