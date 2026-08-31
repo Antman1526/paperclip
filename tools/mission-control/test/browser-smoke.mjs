@@ -84,9 +84,12 @@ async function main() {
     const page = await browser.newPage();
     await page.goto(`${sidecarUrl}/?companyId=${encodeURIComponent(COMPANY_ID)}`, { waitUntil: "networkidle" });
 
+    const landmarks = page.locator("main section[aria-labelledby]");
+    assert.equal(await landmarks.count(), 4, "exactly four main landmark sections should be rendered");
+
     const landmarkNames = ["Company overview", "Agent graph", "Decision rail", "Operations timeline"];
     for (const name of landmarkNames) {
-      const landmark = page.getByRole("region", { name, exact: true });
+      const landmark = page.getByRole("region", { name, exact: true }).and(landmarks);
       assert.equal(await landmark.count(), 1, `${name} landmark should be rendered once`);
       assert.equal(await landmark.isVisible(), true, `${name} landmark should be visible`);
     }

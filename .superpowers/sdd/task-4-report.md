@@ -31,3 +31,7 @@
 - `npm --prefix tools/mission-control test` — PASS.
 - `npm --prefix tools/mission-control run smoke:browser` — PASS.
 - `git diff --check -- tools/mission-control` — PASS.
+
+## Selector scope fix
+
+- `tools/mission-control/test/browser-smoke.mjs` — scoped landmark locators to `main section[aria-labelledby]`, asserted exactly four matching sections, and intersected each accessible-name role locator with that scope for Company overview, Agent graph, Decision rail, and Operations timeline.
