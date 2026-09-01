@@ -4,9 +4,9 @@
 
 **Goal:** Build a local, read-only Mission Control sidecar for BrainPulse Ventures LLC that renders a live Orchestration Map and exposes the existing bounded Paperclip operating loop without changing Paperclip state.
 
-**Architecture:** Add a standalone Node 20 sidecar under `tools/mission-control` in the existing Paperclip repository. A server-side client reads the private Paperclip API using runtime-only environment variables, normalizes non-secret summaries, and serves a static browser UI. The sidecar has no mutation routes and never persists credentials.
+**Architecture:** Add a standalone Node 24.11+ sidecar under `tools/mission-control` in the existing Paperclip repository. A server-side client reads the private Paperclip API using runtime-only environment variables, normalizes non-secret summaries, and serves a static browser UI. The sidecar has no mutation routes and never persists credentials.
 
-**Tech Stack:** Node.js 20+, built-in `node:http`, built-in `node:test`, browser-native HTML/CSS/JavaScript, and the existing repository Playwright installation for one focused browser smoke check.
+**Tech Stack:** Node.js 24.11+, built-in `node:http`, built-in `node:test`, browser-native HTML/CSS/JavaScript, and the existing repository Playwright installation for one focused browser smoke check.
 
 ## Global Constraints
 
@@ -268,7 +268,7 @@ git commit -m "feat(mission-control): add orchestration map surface"
   "name": "@brainpulse/mission-control",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=24.11.0" },
   "scripts": {
     "start": "node src/server.mjs",
     "test": "node --test test/*.test.mjs",
