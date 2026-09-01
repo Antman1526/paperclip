@@ -2,6 +2,8 @@
 
 Mission Control is a local, read-only operational view of one Paperclip company. It runs as a loopback sidecar and reads company state without exposing mutation controls.
 
+Requires Node.js 24.11.0 or newer, matching the repository runtime policy.
+
 ## Runtime-only startup
 
 From this directory, provide the control-plane values at runtime and start the sidecar:
