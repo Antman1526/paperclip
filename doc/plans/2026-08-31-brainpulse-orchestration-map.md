@@ -1,7 +1,5 @@
 # BrainPulse Orchestration Map Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Build a local, read-only Mission Control sidecar for BrainPulse Ventures LLC that renders a live Orchestration Map and exposes the existing bounded Paperclip operating loop without changing Paperclip state.
 
 **Architecture:** Add a standalone Node 24.11+ sidecar under `tools/mission-control` in the existing Paperclip repository. A server-side client reads the private Paperclip API using runtime-only environment variables, normalizes non-secret summaries, and serves a static browser UI. The sidecar has no mutation routes and never persists credentials.
